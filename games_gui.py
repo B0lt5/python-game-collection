@@ -59,12 +59,11 @@ class GameApp(tk.Tk):
     """The main application window."""
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
-        self.title("Python Game Collection GUI")
+        self.title("Python Text-based Games Collection")
         self.geometry("600x450")
 
         # Container Frame: All other frames (pages) will be stacked on top of this.
         container = tk.Frame(self)
-        container.pack(side="top", fill="both", expand=True)
         container = tk.Frame(self, bg="#90EE90") 
         container.pack(side="top", fill="both", expand=True)
         container.grid_rowconfigure(0, weight=1)
@@ -96,12 +95,11 @@ class MainMenu(tk.Frame):
         tk.Frame.__init__(self, parent, bg=bg) 
         self.controller = controller
 
-        tk.Label(self, text="=== Python Game Collection ===", font=('Arial', 16, 'bold'), bg=bg).pack(pady=20)
+        tk.Label(self, text="=== Python Text-based Games Collection ===", font=('Arial', 16, 'bold'), bg=bg).pack(pady=20)
         
         # List of all games to create buttons dynamically
         games = [
             ("1. Number Guessing Game", "NumberGuessingGUI"),
-            # Add other games here (e.g., "2. Word Guessing (Hangman)", "WordGuessingGUI")
             ("2. Word Guessing (Hangman)", "WordGuessingGUI"),
             ("3. Rock-Paper-Scissors", "RockPaperScissorsGUI"),
             ("4. Higher or Lower (1-100)", "HigherOrLowerGUI"),
@@ -112,11 +110,9 @@ class MainMenu(tk.Frame):
 
         for text, frame_name in games:
             if frame_name:
-                # Button will switch the view to the corresponding game frame
-                tk.Button(self, text=text, width=30, command=lambda name=frame_name: controller.show_frame(name)).pack(pady=5)
+                tk.Button(self, text=text, width=50, command=lambda name=frame_name: controller.show_frame(name)).pack(pady=5)
             else:
-                # Placeholder for games we haven't implemented yet
-                tk.Button(self, text=text, width=30, state=tk.DISABLED, command=lambda: messagebox.showinfo("WIP", "Game not yet implemented!")).pack(pady=5)
+                tk.Button(self, text=text, width=50, state=tk.DISABLED, command=lambda: messagebox.showinfo("WIP", "Game not yet implemented!")).pack(pady=5)
 
         tk.Button(self, text="Exit", width=30, command=controller.quit).pack(pady=20)
 
