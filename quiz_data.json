@@ -1,0 +1,14 @@
+[
+    {
+        "question": "What is the capital of France?", 
+        "answer": "paris"
+    },
+    {
+        "question": "Which planet is known as the Red Planet?", 
+        "answer": "mars"
+    },
+    {
+        "question": "What is 5 * 7?", 
+        "answer": "35"
+    }
+]
