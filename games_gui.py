@@ -63,7 +63,6 @@ class GameApp(tk.Tk):
         self.geometry("600x450")
 
         # Container Frame: All other frames (pages) will be stacked on top of this.
-        container = tk.Frame(self)
         container = tk.Frame(self, bg="#90EE90") 
         container.pack(side="top", fill="both", expand=True)
         container.grid_rowconfigure(0, weight=1)
