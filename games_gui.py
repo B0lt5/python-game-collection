@@ -54,6 +54,23 @@ def load_quiz_questions(filename="quiz_data.json"):
         print(f"An unexpected error occurred while reading the file: {e}")
         return []
 
+def normalize_answer(answer):
+    """Normalizes answer by removing spaces and converting written numbers to digits."""
+    # Dictionary for written numbers to digits
+    word_to_num = {
+        'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+        'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9'
+    }
+    
+    # Convert to lowercase and remove spaces
+    normalized = answer.strip().lower().replace(" ", "")
+    
+    # Replace written numbers with digits
+    for word, digit in word_to_num.items():
+        normalized = normalized.replace(word, digit)
+    
+    return normalized
+
 # --- Global Class to Manage the Application ---
 class GameApp(tk.Tk):
     """The main application window."""
@@ -71,7 +88,7 @@ class GameApp(tk.Tk):
         self.frames = {}
         
         # Add all pages/frames to the dictionary
-        for F in (MainMenu, NumberGuessingGUI, WordGuessingGUI, RockPaperScissorsGUI, HigherOrLowerGUI, DiceRollingGUI, QuizGameGUI, TicTacToeGUI):
+        for F in (MainMenu, NumberGuessingGUI, WordGuessingGUI, RockPaperScissorsGUI, HigherOrLowerGUI, DiceRollingGUI, QuizSelectionGUI, QuizGameGUI, TicTacToeGUI):
             page_name = F.__name__
             frame = F(parent=container, controller=self)
             self.frames[page_name] = frame
@@ -103,7 +120,7 @@ class MainMenu(tk.Frame):
             ("3. Rock-Paper-Scissors", "RockPaperScissorsGUI"),
             ("4. Higher or Lower (1-100)", "HigherOrLowerGUI"),
             ("5. Dice Rolling (Betting)", "DiceRollingGUI"),
-            ("6. Quiz Game", "QuizGameGUI"),
+            ("6. Quiz Game", "QuizSelectionGUI"),
             ("7. Tic-Tac-Toe (2-Player)", "TicTacToeGUI"),
         ]
 
@@ -155,7 +172,7 @@ class NumberGuessingGUI(tk.Frame):
         tk.Button(self, text="New Game", command=self.start_game).pack(pady=5)
         
         # Button to return to the main menu
-        tk.Button(self, text="Back to Menu", command=lambda: controller.show_frame("MainMenu")).pack(pady=5)
+        tk.Button(self, text="Back to Menu", command=lambda: [self.start_game(), controller.show_frame("MainMenu")]).pack(pady=5)
 
         # Start the first game automatically
         self.start_game()
@@ -343,7 +360,7 @@ class WordGuessingGUI(tk.Frame):
             
     def back_to_menu(self):
         """Resets the game and returns to the main menu."""
-        self.disable_all_letters()
+        self.start_game()
         self.controller.show_frame("MainMenu")
 
 # --- Rock-Paper-Scissors GUI Frame ---
@@ -387,7 +404,7 @@ class RockPaperScissorsGUI(tk.Frame):
         self.new_game_button = tk.Button(self, text="New Game", command=self.reset_game)
         self.new_game_button.pack(side=tk.LEFT, padx=10, pady=10)
         
-        tk.Button(self, text="Back to Menu", command=lambda: controller.show_frame("MainMenu")).pack(side=tk.RIGHT, padx=10, pady=10)
+        tk.Button(self, text="Back to Menu", command=lambda: [self.reset_game(), controller.show_frame("MainMenu")]).pack(side=tk.RIGHT, padx=10, pady=10)
 
     def update_score_display(self):
         """Updates the Label with the current scores."""
@@ -478,7 +495,7 @@ class HigherOrLowerGUI(tk.Frame):
 
         # Control Buttons
         tk.Button(self, text="New Game", command=self.start_game).pack(side=tk.LEFT, padx=10, pady=10)
-        tk.Button(self, text="Back to Menu", command=lambda: controller.show_frame("MainMenu")).pack(side=tk.RIGHT, padx=10, pady=10)
+        tk.Button(self, text="Back to Menu", command=lambda: [self.start_game(), controller.show_frame("MainMenu")]).pack(side=tk.RIGHT, padx=10, pady=10)
 
         # Start the first game automatically
         self.start_game()
@@ -579,7 +596,7 @@ class DiceRollingGUI(tk.Frame):
 
         # Control Buttons
         tk.Button(self, text="New Game (Reset Money)", command=self.reset_game).pack(side=tk.LEFT, padx=10, pady=10)
-        tk.Button(self, text="Back to Menu", command=lambda: controller.show_frame("MainMenu")).pack(side=tk.RIGHT, padx=10, pady=10)
+        tk.Button(self, text="Back to Menu", command=lambda: [self.reset_game(), controller.show_frame("MainMenu")]).pack(side=tk.RIGHT, padx=10, pady=10)
 
         self.log("Welcome! Bet on High (4-6) or Low (1-3)!")
 
@@ -651,6 +668,35 @@ class DiceRollingGUI(tk.Frame):
         self.place_bet_button.config(state=tk.NORMAL)
         self.bet_entry.config(state=tk.NORMAL)
 
+# --- Quiz Selection GUI Frame ---
+class QuizSelectionGUI(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent, bg="#90EE90")
+        self.controller = controller
+        
+        # --- Widgets Setup ---
+        tk.Label(self, text="=== Select Quiz Difficulty ===", font=('Arial', 16, 'bold'), bg="#90EE90").pack(pady=20)
+        
+        tk.Label(self, text="How many questions would you like to answer?", font=('Arial', 12), bg="#90EE90").pack(pady=10)
+        
+        # Frame for the difficulty buttons
+        button_frame = tk.Frame(self, bg="#90EE90")
+        button_frame.pack(pady=30)
+        
+        tk.Button(button_frame, text="10 Questions", width=15, font=('Arial', 12), command=lambda: self.start_quiz(10)).pack(pady=10)
+        tk.Button(button_frame, text="20 Questions", width=15, font=('Arial', 12), command=lambda: self.start_quiz(20)).pack(pady=10)
+        tk.Button(button_frame, text="30 Questions", width=15, font=('Arial', 12), command=lambda: self.start_quiz(30)).pack(pady=10)
+        
+        # Control Buttons
+        tk.Button(self, text="Back to Menu", command=lambda: controller.show_frame("MainMenu")).pack(pady=20)
+    
+    def start_quiz(self, num_questions):
+        """Transitions to the quiz game with the selected number of questions."""
+        quiz_frame = self.controller.frames["QuizGameGUI"]
+        quiz_frame.set_question_count(num_questions)
+        quiz_frame.start_game()
+        self.controller.show_frame("QuizGameGUI")
+
 # --- Quiz Game GUI Frame ---
 class QuizGameGUI(tk.Frame):
     def __init__(self, parent, controller):
@@ -661,6 +707,7 @@ class QuizGameGUI(tk.Frame):
         self.questions = []
         self.current_question_index = 0
         self.score = 0
+        self.num_questions = 10  # Default to 10 questions
 
         # --- Widgets Setup ---
         tk.Label(self, text="=== Quiz Game ===", font=('Arial', 16, 'bold'), bg="#90EE90").pack(pady=10)
@@ -690,14 +737,23 @@ class QuizGameGUI(tk.Frame):
         self.feedback_label.pack(pady=10)
 
         # Control Buttons
-        tk.Button(self, text="New Game", command=self.start_game).pack(side=tk.LEFT, padx=10, pady=10)
+        tk.Button(self, text="New Game", command=lambda: controller.show_frame("QuizSelectionGUI")).pack(side=tk.LEFT, padx=10, pady=10)
         tk.Button(self, text="Back to Menu", command=lambda: controller.show_frame("MainMenu")).pack(side=tk.RIGHT, padx=10, pady=10)
-
-        self.start_game()
-        
+    
+    def set_question_count(self, num_questions):
+        """Sets the number of questions to use for the upcoming game."""
+        self.num_questions = num_questions
+    
     def start_game(self):
         """Loads questions and resets the game state."""
-        self.questions = load_quiz_questions() # Load questions from the JSON file
+        all_questions = load_quiz_questions() # Load all questions from the JSON file
+        
+        # Randomly select only the specified number of questions
+        if len(all_questions) >= self.num_questions:
+            self.questions = random.sample(all_questions, self.num_questions)
+        else:
+            self.questions = all_questions  # Use all if there aren't enough
+        
         self.current_question_index = 0
         self.score = 0
         
@@ -728,14 +784,17 @@ class QuizGameGUI(tk.Frame):
             return # Should not happen, but a safety check
             
         q_data = self.questions[self.current_question_index]
-        user_answer = self.answer_entry.get().strip().lower()
-        correct_answer = q_data['answer'].strip().lower()
+        user_answer = normalize_answer(self.answer_entry.get())
+        correct_answer = normalize_answer(q_data['answer'])
         
         if user_answer == correct_answer:
             self.score += 1
             self.feedback_label.config(text="✅ Correct!", fg="green")
         else:
-            self.feedback_label.config(text=f"❌ Wrong! Answer: {correct_answer}", fg="red")
+            self.feedback_label.config(text=f"❌ Wrong! Answer: {q_data['answer']}", fg="red")
+            # Add info if available
+            if 'info' in q_data:
+                self.feedback_label.config(text=f"❌ Wrong! Answer: {q_data['answer']}\n{q_data['info']}")
         
         # Move to the next question after a brief delay so the user can see the feedback
         self.current_question_index += 1
@@ -789,7 +848,7 @@ class TicTacToeGUI(tk.Frame):
 
         # Control Buttons
         tk.Button(self, text="New Game", command=self.reset_game).pack(side=tk.LEFT, padx=10, pady=10)
-        tk.Button(self, text="Back to Menu", command=lambda: controller.show_frame("MainMenu")).pack(side=tk.RIGHT, padx=10, pady=10)
+        tk.Button(self, text="Back to Menu", command=lambda: [self.reset_game(), controller.show_frame("MainMenu")]).pack(side=tk.RIGHT, padx=10, pady=10)
 
     def check_winner(self):
         """Checks the 3x3 board for a winner."""
