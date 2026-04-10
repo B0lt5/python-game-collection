@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 import random
 # NOTE: We'll put your existing game logic into this file later, but we need to
 # refactor them to use GUI elements instead of 'print' and 'input'.
@@ -77,7 +77,7 @@ class GameApp(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         self.title("Python Text-based Games Collection")
-        self.geometry("600x450")
+        self.geometry("600x500")
 
         # Container Frame: All other frames (pages) will be stacked on top of this.
         container = tk.Frame(self, bg="#90EE90") 
@@ -88,7 +88,7 @@ class GameApp(tk.Tk):
         self.frames = {}
         
         # Add all pages/frames to the dictionary
-        for F in (MainMenu, NumberGuessingGUI, WordGuessingGUI, RockPaperScissorsGUI, HigherOrLowerGUI, DiceRollingGUI, QuizSelectionGUI, QuizGameGUI, TicTacToeGUI):
+        for F in (MainMenu, MoreGamesMenu, MastermindGUI, WordScrambleGUI, BattleshipGUI, SlotMachineGUI, TextAdventureGUI, NumberGuessingGUI, WordGuessingGUI, RockPaperScissorsGUI, HigherOrLowerGUI, DiceRollingGUI, QuizSelectionGUI, QuizGameGUI, TicTacToeSelectionGUI, TicTacToeGUI, GameWIP):
             page_name = F.__name__
             frame = F(parent=container, controller=self)
             self.frames[page_name] = frame
@@ -121,7 +121,7 @@ class MainMenu(tk.Frame):
             ("4. Higher or Lower (1-100)", "HigherOrLowerGUI"),
             ("5. Dice Rolling (Betting)", "DiceRollingGUI"),
             ("6. Quiz Game", "QuizSelectionGUI"),
-            ("7. Tic-Tac-Toe (2-Player)", "TicTacToeGUI"),
+            ("7. Tic-Tac-Toe", "TicTacToeSelectionGUI"),
         ]
 
         for text, frame_name in games:
@@ -130,7 +130,1146 @@ class MainMenu(tk.Frame):
             else:
                 tk.Button(self, text=text, width=50, state=tk.DISABLED, command=lambda: messagebox.showinfo("WIP", "Game not yet implemented!")).pack(pady=5)
 
+        tk.Button(self, text="More Games", width=30, command=lambda: controller.show_frame("MoreGamesMenu")).pack(pady=10)
         tk.Button(self, text="Exit", width=30, command=controller.quit).pack(pady=20)
+
+# --- More Games Menu Screen ---
+class MoreGamesMenu(tk.Frame):
+    """The screen with additional games."""
+    def __init__(self, parent, controller):
+        bg="#90EE90"
+        tk.Frame.__init__(self, parent, bg=bg) 
+        self.controller = controller
+
+        tk.Label(self, text="=== More Games ===", font=('Arial', 16, 'bold'), bg=bg).pack(pady=20)
+        
+        # List of additional games
+        more_games = [
+            ("8. Mastermind (Bulls and Cows)", "MastermindGUI"),
+            ("9. Word Scramble (Anagrams)", "WordScrambleGUI"),
+            ("10. Battleship", "BattleshipGUI"),
+            ("11. Slot Machine", "SlotMachineGUI"),
+            ("12. Text Adventure (Escape Room)", "TextAdventureGUI"),
+        ]
+
+        for text, frame_name in more_games:
+            if frame_name == "BattleshipGUI":
+                tk.Button(self, text=text, width=50, command=lambda name=frame_name: [controller.winfo_toplevel().geometry("1000x900"), controller.show_frame(name)]).pack(pady=5)
+            elif frame_name == "TextAdventureGUI":
+                tk.Button(self, text=text, width=50, command=lambda name=frame_name: [controller.winfo_toplevel().geometry("900x750"), controller.show_frame(name)]).pack(pady=5)
+            else:
+                tk.Button(self, text=text, width=50, command=lambda name=frame_name: controller.show_frame(name)).pack(pady=5)
+
+        tk.Button(self, text="Back to Menu", width=30, command=lambda: controller.show_frame("MainMenu")).pack(pady=20)
+
+# --- Mastermind (Bulls and Cows) GUI Frame ---
+class MastermindGUI(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent, bg="#90EE90")
+        self.controller = controller
+        
+        # Game State Variables
+        self.secret_number = ""
+        self.attempts = 0
+        self.max_attempts = 10
+        
+        # --- Widgets Setup ---
+        tk.Label(self, text="=== Mastermind (Bulls and Cows) ===", font=('Arial', 16, 'bold'), bg="#90EE90").pack(pady=10)
+        
+        tk.Label(self, text="Guess the 4-digit number with unique digits!", font=('Arial', 12), bg="#90EE90").pack(pady=5)
+        
+        # A Text widget to act as the Game Log
+        self.log_text = tk.Text(self, height=8, width=60, state=tk.DISABLED)
+        self.log_text.pack(pady=10)
+        
+        # Label to show status (Attempts left)
+        self.status_label = tk.Label(self, text="", bg="#90EE90")
+        self.status_label.pack(pady=10)
+        
+        # Frame for Input and Button
+        input_frame = tk.Frame(self, bg="#90EE90")
+        input_frame.pack(pady=10)
+        
+        tk.Label(input_frame, text="Your Guess (4 digits):", bg="#90EE90").pack(side=tk.LEFT, padx=5)
+        
+        # Entry widget for the player's guess
+        self.guess_entry = tk.Entry(input_frame, width=15)
+        self.guess_entry.pack(side=tk.LEFT, padx=5)
+        
+        # Button to submit the guess
+        self.guess_button = tk.Button(input_frame, text="Guess!", command=self.check_guess)
+        self.guess_button.pack(side=tk.LEFT, padx=5)
+        
+        # Control Buttons
+        tk.Button(self, text="New Game", command=self.start_game).pack(side=tk.LEFT, padx=10, pady=10)
+        tk.Button(self, text="Back to More Games", command=lambda: [self.start_game(), controller.show_frame("MoreGamesMenu")]).pack(side=tk.RIGHT, padx=10, pady=10)
+        
+        # Start the first game
+        self.start_game()
+    
+    def log(self, message):
+        """Helper function to update the Text widget (Game Log)"""
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.insert(tk.END, message + "\n")
+        self.log_text.see(tk.END)
+        self.log_text.config(state=tk.DISABLED)
+    
+    def generate_secret_number(self):
+        """Generates a 4-digit number with unique digits."""
+        digits = random.sample(range(10), 4)
+        return ''.join(map(str, digits))
+    
+    def start_game(self):
+        """Initializes the game state."""
+        self.secret_number = self.generate_secret_number()
+        self.attempts = 0
+        
+        # Clear the log and reset status
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.delete('1.0', tk.END)
+        self.log_text.config(state=tk.DISABLED)
+        
+        self.log("New game started! Guess the 4-digit number.")
+        self.log("Bulls = correct digit in correct position")
+        self.log("Cows = correct digit in wrong position")
+        
+        self.status_label.config(text=f"Attempts left: {self.max_attempts}")
+        self.guess_button.config(state=tk.NORMAL)
+        self.guess_entry.config(state=tk.NORMAL)
+        self.guess_entry.delete(0, tk.END)
+    
+    def check_guess(self):
+        """Handles the logic when the 'Guess!' button is pressed."""
+        guess_str = self.guess_entry.get()
+        self.guess_entry.delete(0, tk.END)
+        
+        # Validation
+        if len(guess_str) != 4 or not guess_str.isdigit():
+            self.log("⚠️ Please enter exactly 4 digits!")
+            return
+        
+        if len(set(guess_str)) != 4:
+            self.log("⚠️ All digits must be unique!")
+            return
+        
+        self.attempts += 1
+        
+        # Calculate bulls and cows
+        Bulls = sum(guess_str[i] == self.secret_number[i] for i in range(4))
+        Cows = sum(guess_str[i] in self.secret_number for i in range(4)) - Bulls
+        
+        self.log(f"Guess #{self.attempts}: {guess_str} | Bulls: {Bulls}, Cows: {Cows}")
+        
+        if Bulls == 4:
+            self.log(f"🎉 Correct! You guessed it in {self.attempts} attempts!")
+            self.end_game()
+        elif self.attempts >= self.max_attempts:
+            self.log(f"❌ Game Over! The number was {self.secret_number}")
+            self.end_game()
+        else:
+            self.status_label.config(text=f"Attempts left: {self.max_attempts - self.attempts}")
+    
+    def end_game(self):
+        """Disables input at the end of a round."""
+        self.guess_button.config(state=tk.DISABLED)
+        self.guess_entry.config(state=tk.DISABLED)
+
+# --- Word Scramble (Anagrams) GUI Frame ---
+class WordScrambleGUI(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent, bg="#90EE90")
+        self.controller = controller
+        
+        # Game State Variables
+        self.original_word = ""
+        self.scrambled_word = ""
+        self.time_left = 0
+        self.timer_id = None
+        
+        # --- Widgets Setup ---
+        tk.Label(self, text="=== Word Scramble (Anagrams) ===", font=('Arial', 16, 'bold'), bg="#90EE90").pack(pady=10)
+        
+        # Label for scrambled word
+        self.word_label = tk.Label(self, text="", font=('Arial', 20, 'bold'), bg="#90EE90", fg="blue")
+        self.word_label.pack(pady=20)
+        
+        # Label for timer
+        self.timer_label = tk.Label(self, text="Time: 0s", font=('Arial', 14), bg="#90EE90", fg="red")
+        self.timer_label.pack(pady=10)
+        
+        # A Text widget to act as the Game Log
+        self.log_text = tk.Text(self, height=6, width=60, state=tk.DISABLED)
+        self.log_text.pack(pady=10)
+        
+        # Frame for Input and Button
+        input_frame = tk.Frame(self, bg="#90EE90")
+        input_frame.pack(pady=10)
+        
+        tk.Label(input_frame, text="Your Answer:", bg="#90EE90").pack(side=tk.LEFT, padx=5)
+        
+        # Entry widget for the player's answer
+        self.answer_entry = tk.Entry(input_frame, width=20)
+        self.answer_entry.pack(side=tk.LEFT, padx=5)
+        
+        # Button to submit the answer
+        self.submit_button = tk.Button(input_frame, text="Submit", command=self.check_answer)
+        self.submit_button.pack(side=tk.LEFT, padx=5)
+        
+        # Control Buttons
+        tk.Button(self, text="New Game", command=self.start_game).pack(side=tk.LEFT, padx=10, pady=10)
+        tk.Button(self, text="Back to More Games", command=lambda: [self.stop_timer(), self.start_game(), controller.show_frame("MoreGamesMenu")]).pack(side=tk.RIGHT, padx=10, pady=10)
+        
+        # Start the first game
+        self.start_game()
+    
+    def log(self, message):
+        """Helper function to update the Text widget (Game Log)"""
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.insert(tk.END, message + "\n")
+        self.log_text.see(tk.END)
+        self.log_text.config(state=tk.DISABLED)
+    
+    def scramble_word(self, word):
+        """Scrambles a word by randomly shuffling its letters."""
+        letters = list(word)
+        random.shuffle(letters)
+        return ''.join(letters)
+    
+    def start_game(self):
+        """Initializes the game state."""
+        self.stop_timer()
+        
+        # Load a word from hangman_words
+        words = load_hangman_words()
+        if words == ["error"]:
+            self.word_label.config(text="ERROR: Could not load words!")
+            self.submit_button.config(state=tk.DISABLED)
+            return
+        
+        self.original_word = random.choice(words).lower()
+        self.scrambled_word = self.scramble_word(self.original_word)
+        
+        # Calculate time based on word length (3 seconds per letter, minimum 15 seconds)
+        self.time_left = max(15, len(self.original_word) * 3)
+        
+        # Clear the log
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.delete('1.0', tk.END)
+        self.log_text.config(state=tk.DISABLED)
+        
+        self.log(f"Unscramble the word! Word length: {len(self.original_word)} letters")
+        
+        # Update display
+        self.word_label.config(text=self.scrambled_word)
+        self.submit_button.config(state=tk.NORMAL)
+        self.answer_entry.config(state=tk.NORMAL)
+        self.answer_entry.delete(0, tk.END)
+        
+        # Start the timer
+        self.update_timer()
+    
+    def update_timer(self):
+        """Updates the timer display and decrements time."""
+        self.timer_label.config(text=f"Time: {self.time_left}s")
+        
+        if self.time_left <= 0:
+            self.log("⏰ Time's up! Game Over!")
+            self.log(f"The word was: {self.original_word}")
+            self.end_game()
+        else:
+            self.time_left -= 1
+            self.timer_id = self.after(1000, self.update_timer)  # Update every 1 second
+    
+    def stop_timer(self):
+        """Stops the timer."""
+        if self.timer_id is not None:
+            self.after_cancel(self.timer_id)
+            self.timer_id = None
+    
+    def check_answer(self):
+        """Handles the logic when the 'Submit' button is pressed."""
+        answer_str = self.answer_entry.get().strip().lower()
+        self.answer_entry.delete(0, tk.END)
+        
+        if not answer_str:
+            self.log("⚠️ Please enter an answer!")
+            return
+        
+        if answer_str == self.original_word:
+            self.log(f"🎉 Correct! The word was '{self.original_word}'!")
+            self.stop_timer()
+            self.end_game()
+        else:
+            self.log(f"❌ Wrong! Try again.")
+    
+    def end_game(self):
+        """Disables input at the end of a round."""
+        self.stop_timer()
+        self.submit_button.config(state=tk.DISABLED)
+        self.answer_entry.config(state=tk.DISABLED)
+
+# --- Battleship GUI Frame ---
+class BattleshipGUI(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent, bg="#90EE90")
+        self.controller = controller
+        
+        # Game State Variables
+        self.grid_size = 10
+        self.player_board = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        self.player_shots = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        self.computer_board = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        self.computer_shots = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        
+        self.player_hits = 0
+        self.computer_hits = 0
+        self.total_ship_cells = 9  # 1 3-cell + 2 2-cell + 3 1-cell = 9 cells
+        self.game_phase = "PLACEMENT"  # PLACEMENT or PLAYING
+        
+        # Ship placement variables
+        self.ships_to_place = [(3, 1), (2, 2), (1, 3)]  # (size, count)
+        self.ship_sizes = [3, 2, 2, 1, 1, 1]  # Flat list of 6 ship sizes
+        self.current_ship_idx = 0
+        self.current_ship_size = 3
+        self.placement_board_buttons = {}
+        
+        # --- Widgets Setup ---
+        tk.Label(self, text="=== Battleship ===", font=('Arial', 16, 'bold'), bg="#90EE90").pack(pady=10)
+        
+        # Status label
+        self.status_label = tk.Label(self, text="Place your ships! Click on the board.", font=('Arial', 12), bg="#90EE90")
+        self.status_label.pack(pady=5)
+        
+        # Scores (hidden during placement)
+        self.score_label = tk.Label(self, text="Your Hits: 0/9 | Computer Hits: 0/9", font=('Arial', 11), bg="#90EE90")
+        
+        # Placement instructions (shown during placement)
+        self.instruction_label = tk.Label(self, text="Ship placement goes here", font=('Arial', 10), bg="#90EE90")
+        
+        # Main content frame
+        self.content_frame = tk.Frame(self, bg="#90EE90")
+        self.content_frame.pack(pady=10, fill=tk.BOTH, expand=True)
+        
+        # Game log
+        self.log_text = tk.Text(self, height=6, width=40, state=tk.DISABLED)
+        
+        # Frame for Input
+        self.input_frame = tk.Frame(self, bg="#90EE90")
+        
+        # Letter entry
+        self.letter_entry = tk.Entry(self.input_frame, width=3)
+        
+        # Number entry
+        self.number_entry = tk.Entry(self.input_frame, width=3)
+        
+        # Fire button
+        self.fire_button = tk.Button(self.input_frame, text="Fire!", command=self.player_fire)
+        
+        # Control Buttons frame
+        self.button_frame = tk.Frame(self, bg="#90EE90")
+        
+        # Start the placement phase
+        self.init_placement_phase()
+    
+    def init_placement_phase(self):
+        """Initialize the ship placement phase."""
+        self.game_phase = "PLACEMENT"
+        self.player_board = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        self.current_ship_idx = 0
+        self.current_ship_size = self.ship_sizes[0]
+        
+        self.status_label.config(text=f"Place your ships! Click on the board.")
+        self.instruction_label.config(text=f"Placing ship of size {self.current_ship_size} (ship 1 of 6)")
+        self.instruction_label.pack(pady=5)
+        self.score_label.pack_forget()
+        
+        # Clear content frame efficiently
+        self.content_frame.pack_forget()
+        self.content_frame.destroy()
+        self.content_frame = tk.Frame(self, bg="#90EE90")
+        self.content_frame.pack(pady=10, fill=tk.BOTH, expand=True)
+        
+        # Create placement board
+        board_frame = tk.Frame(self.content_frame, bg="white", relief=tk.SUNKEN, bd=2)
+        board_frame.pack(padx=10, fill=tk.BOTH, expand=True)
+        
+        tk.Label(board_frame, text="Your Board - Place Ships", font=('Arial', 10, 'bold'), bg="white").pack()
+        
+        grid_frame = tk.Frame(board_frame, bg="white")
+        grid_frame.pack(padx=5, pady=5)
+        
+        tk.Label(grid_frame, text="  ", bg="white", width=2).grid(row=0, column=0)
+        for col in range(self.grid_size):
+            tk.Label(grid_frame, text=chr(ord('A') + col), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=0, column=col + 1)
+        
+        self.placement_board_buttons = {}
+        for row in range(self.grid_size):
+            tk.Label(grid_frame, text=str(row + 1), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=row + 1, column=0)
+            for col in range(self.grid_size):
+                btn = tk.Label(grid_frame, text=" ", bg="lightblue", width=2, height=1, font=('Arial', 8), relief=tk.RAISED, bd=1)
+                btn.grid(row=row + 1, column=col + 1)
+                btn.bind("<Button-1>", lambda e, r=row, c=col: self.place_ship_on_board(r, c))
+                self.placement_board_buttons[(row, col)] = btn
+        
+        # Placement buttons
+        placement_btn_frame = tk.Frame(self.content_frame, bg="#90EE90")
+        placement_btn_frame.pack(pady=10)
+        tk.Button(placement_btn_frame, text="Random Placement", command=self.random_placement).pack(side=tk.LEFT, padx=5)
+        tk.Button(placement_btn_frame, text="Start Game", command=self.start_game_from_placement).pack(side=tk.LEFT, padx=5)
+    
+    def place_ship_on_board(self, row, col):
+        """Try to place a ship at the given coordinates."""
+        if not self.can_place_ship(self.player_board, row, col, self.current_ship_size, 'H'):
+            if not self.can_place_ship(self.player_board, row, col, self.current_ship_size, 'V'):
+                self.instruction_label.config(text="Can't place there! Try another spot.")
+                return
+            direction = 'V'
+        else:
+            direction = 'H'
+        
+        # Place the ship
+        for i in range(self.current_ship_size):
+            if direction == 'H':
+                self.player_board[row][col + i] = 'S'
+                self.placement_board_buttons[(row, col + i)].config(bg="gray")
+            else:
+                self.player_board[row + i][col] = 'S'
+                self.placement_board_buttons[(row + i, col)].config(bg="gray")
+        
+        # Move to next ship
+        self.current_ship_idx += 1
+        if self.current_ship_idx >= 6:  # 6 total ships
+            self.instruction_label.config(text="All ships placed! Starting game...")
+            self.after(500, self.start_game_from_placement)  # Auto-start after 500ms
+        else:
+            self.current_ship_size = self.ship_sizes[self.current_ship_idx]
+            ship_num = self.current_ship_idx + 1
+            self.instruction_label.config(text=f"Placing ship of size {self.current_ship_size} (ship {ship_num} of 6)")
+    
+    def random_placement(self):
+        """Randomly place all remaining ships."""
+        self.player_board = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        self.place_ships(self.player_board)
+        
+        # Update display
+        for (row, col), btn in self.placement_board_buttons.items():
+            if self.player_board[row][col] == 'S':
+                btn.config(bg="gray")
+            else:
+                btn.config(bg="lightblue")
+        
+        self.instruction_label.config(text="Ships randomly placed! Click 'Start Game'")
+        self.current_ship_idx = 6
+    
+    def start_game_from_placement(self):
+        """Transition from placement phase to game phase."""
+        if self.current_ship_idx < 6:
+            self.instruction_label.config(text="Place all ships first!")
+            return
+        
+        self.game_phase = "PLAYING"
+        self.place_ships(self.computer_board)
+        self.instruction_label.config(text="")
+        self.instruction_label.pack_forget()
+        self.score_label.pack(pady=5)
+        self.init_game_phase()
+    
+    def init_game_phase(self):
+        """Initialize the actual game phase with two boards."""
+        # Clear content frame efficiently
+        self.content_frame.pack_forget()
+        self.content_frame.destroy()
+        self.content_frame = tk.Frame(self, bg="#90EE90")
+        self.content_frame.pack(pady=10, fill=tk.BOTH, expand=True)
+        
+        # Main content frame with two boards
+        boards_frame = tk.Frame(self.content_frame, bg="#90EE90")
+        boards_frame.pack(padx=10, fill=tk.BOTH, expand=True)
+        
+        # LEFT BOARD: Computer's Board (where player fires)
+        left_frame = tk.Frame(boards_frame, bg="white", relief=tk.SUNKEN, bd=2)
+        left_frame.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
+        
+        tk.Label(left_frame, text="Computer's Board", font=('Arial', 10, 'bold'), bg="white").pack()
+        
+        left_grid = tk.Frame(left_frame, bg="white")
+        left_grid.pack(padx=5, pady=5)
+        
+        tk.Label(left_grid, text="  ", bg="white", width=2).grid(row=0, column=0)
+        for col in range(self.grid_size):
+            tk.Label(left_grid, text=chr(ord('A') + col), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=0, column=col + 1)
+        
+        self.computer_board_buttons = {}
+        for row in range(self.grid_size):
+            tk.Label(left_grid, text=str(row + 1), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=row + 1, column=0)
+            for col in range(self.grid_size):
+                btn = tk.Label(left_grid, text=" ", bg="lightblue", width=2, height=1, font=('Arial', 8), relief=tk.RAISED, bd=1)
+                btn.grid(row=row + 1, column=col + 1)
+                self.computer_board_buttons[(row, col)] = btn
+        
+        # RIGHT BOARD: Player's Board (where computer fires)
+        right_frame = tk.Frame(boards_frame, bg="white", relief=tk.SUNKEN, bd=2)
+        right_frame.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
+        
+        tk.Label(right_frame, text="Your Board", font=('Arial', 10, 'bold'), bg="white").pack()
+        
+        right_grid = tk.Frame(right_frame, bg="white")
+        right_grid.pack(padx=5, pady=5)
+        
+        tk.Label(right_grid, text="  ", bg="white", width=2).grid(row=0, column=0)
+        for col in range(self.grid_size):
+            tk.Label(right_grid, text=chr(ord('A') + col), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=0, column=col + 1)
+        
+        self.player_board_buttons = {}
+        for row in range(self.grid_size):
+            tk.Label(right_grid, text=str(row + 1), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=row + 1, column=0)
+            for col in range(self.grid_size):
+                btn = tk.Label(right_grid, text=" ", bg="lightgreen", width=2, height=1, font=('Arial', 8), relief=tk.RAISED, bd=1)
+                btn.grid(row=row + 1, column=col + 1)
+                self.player_board_buttons[(row, col)] = btn
+        
+        # Log and input frame
+        log_input_frame = tk.Frame(self.content_frame, bg="#90EE90")
+        log_input_frame.pack(side=tk.RIGHT, padx=10, fill=tk.BOTH)
+        
+        self.log_text.config(height=8, width=30, state=tk.DISABLED)
+        self.log_text.pack(pady=5)
+        
+        # Input frame
+        self.input_frame.destroy()
+        self.input_frame = tk.Frame(log_input_frame, bg="#90EE90")
+        self.input_frame.pack(pady=5)
+        
+        tk.Label(self.input_frame, text="Fire at:", bg="#90EE90").pack(side=tk.LEFT, padx=5)
+        tk.Label(self.input_frame, text="Letter:", bg="#90EE90").pack(side=tk.LEFT, padx=2)
+        self.letter_entry = tk.Entry(self.input_frame, width=3)
+        self.letter_entry.pack(side=tk.LEFT, padx=2)
+        tk.Label(self.input_frame, text="Number:", bg="#90EE90").pack(side=tk.LEFT, padx=2)
+        self.number_entry = tk.Entry(self.input_frame, width=3)
+        self.number_entry.pack(side=tk.LEFT, padx=2)
+        self.fire_button = tk.Button(self.input_frame, text="Fire!", command=self.player_fire)
+        self.fire_button.pack(side=tk.LEFT, padx=5)
+        
+        # Control buttons
+        self.button_frame.destroy()
+        self.button_frame = tk.Frame(self, bg="#90EE90")
+        self.button_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+        tk.Button(self.button_frame, text="New Game", command=self.reset_to_placement).pack(side=tk.LEFT, padx=10)
+        tk.Button(self.button_frame, text="Back to More Games", command=self.back_to_menu).pack(side=tk.RIGHT, padx=10)
+        
+        self.log("Game started!")
+        self.update_all_boards()
+    
+    def update_all_boards(self):
+        """Updates both boards with current shot status."""
+        # Update computer's board (where player fires)
+        for row in range(self.grid_size):
+            for col in range(self.grid_size):
+                btn = self.computer_board_buttons[(row, col)]
+                shot = self.player_shots[row][col]
+                if shot == 'H':
+                    btn.config(bg="red", text="H")
+                elif shot == 'M':
+                    btn.config(bg="lightgray", text="M")
+                else:
+                    btn.config(bg="lightblue", text=" ")
+        
+        # Update player's board (where computer fires)
+        for row in range(self.grid_size):
+            for col in range(self.grid_size):
+                btn = self.player_board_buttons[(row, col)]
+                shot = self.computer_shots[row][col]
+                if self.player_board[row][col] == 'S':
+                    if shot == 'H':
+                        btn.config(bg="darkred", text="H")
+                    elif shot == 'M':
+                        pass  # Don't show misses on player's board
+                    else:
+                        btn.config(bg="lightgreen", text="S")
+                else:
+                    if shot == 'M':
+                        btn.config(bg="lightgray", text="M")
+                    else:
+                        btn.config(bg="lightgreen", text=" ")
+    
+    def log(self, message):
+        """Helper function to update the Text widget (Game Log)"""
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.insert(tk.END, message + "\n")
+        self.log_text.see(tk.END)
+        self.log_text.config(state=tk.DISABLED)
+    
+    def place_ships(self, board):
+        """Places ships on the board randomly."""
+        # Ship configurations: [size, count]
+        ships = [(3, 1), (2, 2), (1, 3)]  # 1 3-length, 2 2-length, 3 1-length
+        
+        for size, count in ships:
+            for _ in range(count):
+                placed = False
+                while not placed:
+                    row = random.randint(0, self.grid_size - 1)
+                    col = random.randint(0, self.grid_size - 1)
+                    direction = random.choice(['H', 'V'])  # Horizontal or Vertical
+                    
+                    # Check if placement is valid
+                    if self.can_place_ship(board, row, col, size, direction):
+                        # Place the ship
+                        for i in range(size):
+                            if direction == 'H':
+                                board[row][col + i] = 'S'  # S for ship
+                            else:
+                                board[row + i][col] = 'S'
+                        placed = True
+    
+    def can_place_ship(self, board, row, col, size, direction):
+        """Checks if a ship can be placed at the given position."""
+        if direction == 'H':
+            if col + size > self.grid_size:
+                return False
+            for i in range(size):
+                if board[row][col + i] == 'S':
+                    return False
+        else:  # Vertical
+            if row + size > self.grid_size:
+                return False
+            for i in range(size):
+                if board[row + i][col] == 'S':
+                    return False
+        return True
+    
+    
+    def reset_to_placement(self):
+        """Go back to the placement phase."""
+        self.init_placement_phase()
+    
+    def back_to_menu(self):
+        """Return to more games menu and reset window size."""
+        self.reset_to_placement()
+        self.controller.winfo_toplevel().geometry("600x550")
+        self.controller.show_frame("MoreGamesMenu")
+    
+    def update_score_display(self):
+        """Updates the score display."""
+        self.score_label.config(text=f"Your Hits: {self.player_hits}/{self.total_ship_cells} | Computer Hits: {self.computer_hits}/{self.total_ship_cells}")
+    
+    def coordinates_to_index(self, letter, number):
+        """Converts letter and number to row and column indices."""
+        try:
+            col = ord(letter.upper()) - ord('A')
+            row = int(number) - 1
+            
+            if col < 0 or col >= self.grid_size or row < 0 or row >= self.grid_size:
+                return None, None
+            
+            return row, col
+        except (ValueError, TypeError):
+            return None, None
+    
+    def index_to_coordinates(self, row, col):
+        """Converts row and column indices to letter and number."""
+        letter = chr(ord('A') + col)
+        number = row + 1
+        return f"{letter} {number}"
+    
+    def player_fire(self):
+        """Handles player's fire action."""
+        letter = self.letter_entry.get().strip()
+        number = self.number_entry.get().strip()
+        
+        self.letter_entry.delete(0, tk.END)
+        self.number_entry.delete(0, tk.END)
+        
+        row, col = self.coordinates_to_index(letter, number)
+        
+        if row is None or col is None:
+            self.log("⚠️ Invalid coordinates! Use format: A 5")
+            return
+        
+        if self.player_shots[row][col] != ' ':
+            self.log("⚠️ You already fired at that location!")
+            return
+        
+        # Fire at computer's board
+        if self.computer_board[row][col] == 'S':
+            self.player_shots[row][col] = 'H'  # Hit
+            self.player_hits += 1
+            coords = self.index_to_coordinates(row, col)
+            self.log(f"🎯 Hit at {coords}!")
+            
+            if self.player_hits >= self.total_ship_cells:
+                self.log("🎉 You sank all the computer's ships! You win!")
+                self.game_active = False
+                self.end_game()
+                return
+        else:
+            self.player_shots[row][col] = 'M'  # Miss
+            coords = self.index_to_coordinates(row, col)
+            self.log(f"❌ Miss at {coords}.")
+        
+        self.update_all_boards()
+        self.update_score_display()
+        
+        # Computer's turn
+        self.computer_fire()
+    
+    def computer_fire(self):
+        """Handles computer's fire action (random for now)."""
+        row = random.randint(0, self.grid_size - 1)
+        col = random.randint(0, self.grid_size - 1)
+        
+        # Find an unfired location
+        attempts = 0
+        while self.computer_shots[row][col] != ' ' and attempts < 100:
+            row = random.randint(0, self.grid_size - 1)
+            col = random.randint(0, self.grid_size - 1)
+            attempts += 1
+        
+        if self.computer_shots[row][col] != ' ':
+            return  # No valid moves left (shouldn't happen)
+        
+        # Fire at player's board
+        if self.player_board[row][col] == 'S':
+            self.computer_shots[row][col] = 'H'  # Hit
+            self.computer_hits += 1
+            coords = self.index_to_coordinates(row, col)
+            self.log(f"💥 Computer hit at {coords}!")
+            
+            if self.computer_hits >= self.total_ship_cells:
+                self.log("💻 Computer sank all your ships! You lose!")
+                self.game_active = False
+                self.end_game()
+                return
+        else:
+            self.computer_shots[row][col] = 'M'  # Miss
+            coords = self.index_to_coordinates(row, col)
+            self.log(f"💭 Computer fired at {coords} and missed.")
+        
+        self.update_all_boards()
+        self.update_score_display()
+    
+    def end_game(self):
+        """Disables input at the end of the game."""
+        self.fire_button.config(state=tk.DISABLED)
+        self.letter_entry.config(state=tk.DISABLED)
+        self.number_entry.config(state=tk.DISABLED)
+
+# --- Slot Machine Game GUI Frame ---
+class SlotMachineGUI(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent, bg="#90EE90")
+        self.controller = controller
+        
+        # Game State Variables
+        self.balance = 100
+        self.symbols = ["🍒", "🍋", "🔔", "💎"]
+        self.current_reels = ["🍒", "🍋", "🔔"]
+        self.spinning = False
+        
+        # --- Widgets Setup ---
+        tk.Label(self, text="=== Slot Machine ===", font=('Arial', 16, 'bold'), bg="#90EE90").pack(pady=10)
+        
+        # Balance display
+        self.balance_label = tk.Label(self, text=f"💰 Balance: ${self.balance}", font=('Arial', 14, 'bold'), bg="#90EE90")
+        self.balance_label.pack(pady=10)
+        
+        # Reel display (three large symbols)
+        reel_frame = tk.Frame(self, bg="#90EE90")
+        reel_frame.pack(pady=20)
+        
+        self.reel_labels = []
+        for i in range(3):
+            label = tk.Label(reel_frame, text=self.current_reels[i], font=('Arial', 60, 'bold'), 
+                            bg="white", width=4, relief=tk.SUNKEN, bd=3)
+            label.pack(side=tk.LEFT, padx=10)
+            self.reel_labels.append(label)
+        
+        # Bet input frame
+        bet_frame = tk.Frame(self, bg="#90EE90")
+        bet_frame.pack(pady=15)
+        
+        tk.Label(bet_frame, text="Bet Amount:", font=('Arial', 12), bg="#90EE90").pack(side=tk.LEFT, padx=5)
+        self.bet_entry = tk.Entry(bet_frame, width=10, font=('Arial', 12))
+        self.bet_entry.pack(side=tk.LEFT, padx=5)
+        self.bet_entry.insert(0, "10")  # Default bet
+        
+        # Quick bet buttons
+        quick_bet_frame = tk.Frame(self, bg="#90EE90")
+        quick_bet_frame.pack(pady=5)
+        
+        for amount in [5, 10, 20, 50]:
+            tk.Button(quick_bet_frame, text=f"${amount}", width=6, 
+                     command=lambda a=amount: self.set_bet(a), bg="lightblue").pack(side=tk.LEFT, padx=3)
+        
+        # Spin button
+        self.spin_button = tk.Button(self, text="SPIN!", font=('Arial', 14, 'bold'), 
+                                     bg="gold", width=20, command=self.spin)
+        self.spin_button.pack(pady=15)
+        
+        # Result message
+        self.result_label = tk.Label(self, text="Place a bet and spin!", font=('Arial', 12), bg="#90EE90", fg="blue")
+        self.result_label.pack(pady=10)
+        
+        # Control buttons
+        button_frame = tk.Frame(self, bg="#90EE90")
+        button_frame.pack(pady=15)
+        
+        tk.Button(button_frame, text="New Game (Reset)", command=self.reset_game, width=15).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Back to Menu", 
+                 command=lambda: [self.reset_game(), controller.show_frame("MoreGamesMenu")], width=15).pack(side=tk.LEFT, padx=5)
+    
+    def set_bet(self, amount):
+        """Set the bet amount from quick buttons."""
+        self.bet_entry.delete(0, tk.END)
+        self.bet_entry.insert(0, str(amount))
+    
+    def spin(self):
+        """Spin the reels."""
+        if self.spinning:
+            return
+        
+        # Get bet amount
+        try:
+            bet = int(self.bet_entry.get())
+            if bet <= 0:
+                self.result_label.config(text="Bet must be positive!", fg="red")
+                return
+            if bet > self.balance:
+                self.result_label.config(text="Not enough balance!", fg="red")
+                return
+        except ValueError:
+            self.result_label.config(text="Invalid bet amount!", fg="red")
+            return
+        
+        self.spinning = True
+        self.spin_button.config(state=tk.DISABLED)
+        
+        # Spin animation
+        self.animate_spin(bet, 0)
+    
+    def animate_spin(self, bet, frame):
+        """Animate spinning reels."""
+        if frame < 15:  # Spin for 15 frames
+            for i in range(3):
+                self.current_reels[i] = random.choice(self.symbols)
+                self.reel_labels[i].config(text=self.current_reels[i])
+            self.after(100, lambda: self.animate_spin(bet, frame + 1))
+        else:
+            # Spin complete, calculate result
+            self.calculate_result(bet)
+            self.spinning = False
+            self.spin_button.config(state=tk.NORMAL)
+    
+    def calculate_result(self, bet):
+        """Calculate win/loss and update balance."""
+        reel1, reel2, reel3 = self.current_reels
+        
+        # Check for matches
+        matches = sum([reel1 == reel2, reel2 == reel3, reel1 == reel3])
+        
+        winnings = 0
+        if reel1 == reel2 == reel3:  # All three match
+            winnings = bet * 10
+            message = f"🎉 THREE OF A KIND! Won ${winnings}!"
+            color = "green"
+        elif matches == 1:  # Two match
+            winnings = bet * 3
+            message = f"✨ TWO MATCH! Won ${winnings}!"
+            color = "green"
+        else:  # No match
+            message = f"💔 No match. Lost ${bet}."
+            color = "red"
+        
+        self.balance -= bet
+        self.balance += winnings
+        
+        # Update displays
+        self.balance_label.config(text=f"💰 Balance: ${self.balance}")
+        self.result_label.config(text=message, fg=color)
+        
+        # Check if player is out of money
+        if self.balance <= 0:
+            self.result_label.config(text="Game Over! You're out of money!", fg="red")
+            self.spin_button.config(state=tk.DISABLED)
+    
+    def reset_game(self):
+        """Reset the game to initial state."""
+        self.balance = 100
+        self.current_reels = ["🍒", "🍋", "🔔"]
+        self.spinning = False
+        
+        self.balance_label.config(text=f"💰 Balance: ${self.balance}")
+        self.result_label.config(text="Place a bet and spin!", fg="blue")
+        self.spin_button.config(state=tk.NORMAL)
+        self.bet_entry.delete(0, tk.END)
+        self.bet_entry.insert(0, "10")
+        
+        for i, label in enumerate(self.reel_labels):
+            label.config(text=self.current_reels[i])
+
+# --- Text Adventure (Escape Room) GUI Frame ---
+class TextAdventureGUI(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent, bg="#2C3E50")
+        self.controller = controller
+        
+        # Game State Variables
+        self.current_scene = "main_room"
+        self.has_silver_key = False
+        self.has_iron_key = False
+        self.has_seen_code = False  # Code only appears after visiting desk
+        self.in_code_entry = False  # Flag to prevent recursion
+        
+        # Define all scenes and choices
+        self.scenes = {
+            "main_room": {
+                "title": "The Locked Study",
+                "description": "You wake up with a headache in a dimly lit, dusty study. You have no memory of how you got here. "
+                               "The only light comes from a flickering candle. The air is stale. You need to get out. "
+                               "You look around and see three things of interest: a heavy oak Door, a cluttered Desk, and a tall Bookshelf.\n\n"
+                               "What do you want to inspect?",
+                "choices": [
+                    ("1. Inspect the Door", "door_inspect"),
+                    ("2. Inspect the Desk", "desk_inspect"),
+                    ("3. Inspect the Bookshelf", "bookshelf_inspect"),
+                ]
+            },
+            "door_inspect": {
+                "title": "The Heavy Oak Door",
+                "description": None,  # Will be set dynamically
+                "choices": [
+                    ("1. Go back", "main_room"),
+                ]
+            },
+            "door_escape": {
+                "title": "🎉 FREEDOM!",
+                "description": "You slide the heavy Iron Key into the lock. It turns with a satisfying CLICK. "
+                               "You push the door open and cool, fresh air hits your face. You have escaped!",
+                "choices": [
+                    ("1. Play Again", "restart"),
+                ]
+            },
+            "desk_inspect": {
+                "title": "The Cluttered Desk",
+                "description": "You walk over to the desk. It is covered in dust. You find a torn piece of paper with the numbers "
+                               "'7-3-8-4' scribbled on it in red ink. You also notice a small drawer, but it is locked with a tiny silver padlock.",
+                "choices": [
+                    ("1. Try to force the drawer open", "desk_force_drawer"),
+                    ("2. Leave the desk", "main_room"),
+                ]
+            },
+            "desk_force_drawer": {
+                "title": "The Desk Drawer",
+                "description": None,  # Will be set dynamically
+                "choices": [
+                    ("1. Go back to the desk", "desk_inspect"),
+                    ("1a. Return to main room", "main_room"),
+                ]
+            },
+            "bookshelf_inspect": {
+                "title": "The Tall Bookshelf",
+                "description": "The bookshelf is filled with thick, ancient books. You notice one book looks completely different—"
+                               "it has no title and is made of metal. You pull it out and realize it's actually a lockbox! "
+                               "It requires a 4-digit passcode.",
+                "choices": [
+                    ("1. Enter a 4-digit code", "bookshelf_code_entry"),
+                    ("2. Put the box down and walk away", "main_room"),
+                ]
+            },
+            "bookshelf_code_entry": {
+                "title": "Metal Lockbox - Code Entry",
+                "description": "Enter the 4-digit code from the desk to open the lockbox...",  # Will be updated after code entry
+                "choices": [],  # Will be set dynamically
+            },
+            "bookshelf_code_correct": {
+                "title": "The Metal Lockbox Opens!",
+                "description": "A green light flashes, and the box pops open! Inside, resting on a velvet cushion, is a small Silver Key.",
+                "choices": [
+                    ("1. Take the Silver Key and return to main room", "main_room"),
+                ]
+            },
+            "bookshelf_already_open": {
+                "title": "The Bookshelf",
+                "description": "You look at the bookshelf. The metal lockbox is already open and empty. There is nothing else of interest here.",
+                "choices": [
+                    ("1. Return to main room", "main_room"),
+                ]
+            },
+            "restart": {
+                "title": "New Game",
+                "description": "Restarting...",
+                "choices": [
+                    ("1. Begin", "main_room"),
+                ]
+            }
+        }
+        
+        # --- Widgets Setup ---
+        tk.Label(self, text="=== The Locked Study: Escape Room ===", font=('Arial', 16, 'bold'), 
+                bg="#2C3E50", fg="#ECF0F1").pack(pady=10)
+        
+        # Scene title
+        self.title_label = tk.Label(self, text="", font=('Arial', 14, 'bold'), 
+                                   bg="#2C3E50", fg="#3498DB", wraplength=500)
+        self.title_label.pack(pady=10)
+        
+        # Scene description
+        self.description_text = tk.Text(self, height=12, width=80, state=tk.DISABLED, 
+                                        bg="#34495E", fg="#ECF0F1", font=('Arial', 11), wrap=tk.WORD)
+        self.description_text.pack(pady=15, padx=20, fill=tk.BOTH, expand=True)
+        
+        # Inventory display
+        self.inventory_label = tk.Label(self, text="Inventory: Code (7-3-8-4)", font=('Arial', 10, 'bold'), 
+                                       bg="#2C3E50", fg="#F39C12")
+        self.inventory_label.pack(pady=5)
+        
+        # Choices frame
+        self.choices_frame = tk.Frame(self, bg="#2C3E50")
+        self.choices_frame.pack(pady=15, fill=tk.BOTH, expand=True)
+        
+        # Control Buttons
+        button_frame = tk.Frame(self, bg="#2C3E50")
+        button_frame.pack(pady=10)
+        
+        tk.Button(button_frame, text="Restart Game", command=self.restart_game, 
+                 bg="#E74C3C", fg="white", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Back to Menu", 
+                 command=lambda: [self.restart_game(), controller.winfo_toplevel().geometry("600x500"), controller.show_frame("MoreGamesMenu")],
+                 bg="#27AE60", fg="white", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=5)
+        
+        # Start the game
+        self.show_scene("main_room")
+    
+    def show_scene(self, scene_key):
+        """Display a scene and its choices."""
+        if scene_key == "restart":
+            self.restart_game()
+            return
+        
+        if scene_key not in self.scenes:
+            scene_key = "main_room"
+        
+        self.current_scene = scene_key
+        scene = self.scenes[scene_key]
+        
+        # Dynamic scene content based on inventory
+        if scene_key == "door_inspect":
+            if self.has_iron_key:
+                self.show_scene("door_escape")
+                return
+            else:
+                description = "You pull on the brass handle, but it doesn't budge. There is a heavy, old-fashioned keyhole. " \
+                             "You need to find the right key to open this door."
+                scene["description"] = description
+        
+        elif scene_key == "desk_inspect":
+            self.has_seen_code = True  # Player finds the code here
+        
+        elif scene_key == "desk_force_drawer":
+            if self.has_silver_key:
+                description = "You use the small Silver Key on the tiny padlock. It pops open! Inside the drawer, " \
+                             "you find a heavy, rusty Iron Key."
+                self.has_iron_key = True
+                scene["description"] = description
+            else:
+                description = "You pull hard, but the wood is too sturdy. You need a key."
+                scene["description"] = description
+        
+        elif scene_key == "bookshelf_inspect":
+            if self.has_silver_key:
+                self.show_scene("bookshelf_already_open")
+                return
+        
+        elif scene_key == "bookshelf_code_entry" and not self.in_code_entry:
+            self.in_code_entry = True
+            self.prompt_code_entry()
+            self.in_code_entry = False
+            return
+        
+        # Update title
+        self.title_label.config(text=scene["title"])
+        
+        # Update description
+        self.description_text.config(state=tk.NORMAL)
+        self.description_text.delete(1.0, tk.END)
+        if scene["description"] is not None:
+            self.description_text.insert(tk.END, scene["description"])
+        self.description_text.config(state=tk.DISABLED)
+        
+        # Update inventory display
+        inv_items = []
+        if self.has_seen_code:
+            inv_items.append("Code (7-3-8-4)")
+        if self.has_silver_key:
+            inv_items.append("Silver Key")
+        if self.has_iron_key:
+            inv_items.append("Iron Key")
+        
+        if inv_items:
+            self.inventory_label.config(text="Inventory: " + ", ".join(inv_items))
+        else:
+            self.inventory_label.config(text="Inventory: Empty")
+        
+        # Clear previous choices
+        for widget in self.choices_frame.winfo_children():
+            widget.destroy()
+        
+        # Display choice buttons
+        if scene["choices"]:
+            for choice_text, next_scene in scene["choices"]:
+                btn = tk.Button(self.choices_frame, text=choice_text, width=60, 
+                               command=lambda s=next_scene: self.show_scene(s),
+                               bg="#3498DB", fg="white", font=('Arial', 11),
+                               relief=tk.RAISED, bd=2, activebackground="#2980B9")
+                btn.pack(pady=5)
+    
+    def prompt_code_entry(self):
+        """Prompt player to enter the 4-digit code."""
+        result = simpledialog.askstring("Enter Code", "Enter the 4-digit code from the desk:", parent=self)
+        
+        if result is None:  # User cancelled
+            self.show_scene("bookshelf_inspect")
+            return
+        
+        result = result.strip()
+        
+        if result == "7384" or result == "7-3-8-4":
+            self.has_silver_key = True
+            self.scenes["bookshelf_code_entry"]["description"] = \
+                "A green light flashes, and the box pops open! Inside, resting on a velvet cushion, is a small Silver Key."
+            self.scenes["bookshelf_code_entry"]["choices"] = \
+                [("1. Take the Silver Key and return to main room", "main_room")]
+        else:
+            self.scenes["bookshelf_code_entry"]["description"] = \
+                "The box beeps angrily and flashes a red light. The code is incorrect. " \
+                "You hear the lockbox reset with a mechanical click."
+            self.scenes["bookshelf_code_entry"]["choices"] = \
+                [("1. Try again", "bookshelf_code_entry"), ("2. Give up and return", "main_room")]
+        
+        self.show_scene("bookshelf_code_entry")
+    
+    def restart_game(self):
+        """Reset the game to the start."""
+        self.current_scene = "main_room"
+        self.has_silver_key = False
+        self.has_iron_key = False
+        self.has_seen_code = False
+        self.in_code_entry = False
+        self.show_scene("main_room")
+
+# --- Game WIP Screen ---
+class GameWIP(tk.Frame):
+    """Placeholder screen for work in progress games."""
+    def __init__(self, parent, controller):
+        bg="#90EE90"
+        tk.Frame.__init__(self, parent, bg=bg) 
+        self.controller = controller
+
+        tk.Label(self, text="=== Game Coming Soon ===", font=('Arial', 16, 'bold'), bg=bg).pack(pady=20)
+        
+        tk.Label(self, text="I Work!", font=('Arial', 24, 'bold'), bg=bg).pack(pady=50)
+
+        tk.Button(self, text="Back to More Games", width=30, command=lambda: controller.show_frame("MoreGamesMenu")).pack(pady=20)
 
 # --- Number Guessing Game GUI Frame ---
 class NumberGuessingGUI(tk.Frame):
@@ -808,6 +1947,35 @@ class QuizGameGUI(tk.Frame):
         self.submit_button.config(state=tk.DISABLED)
         self.answer_entry.config(state=tk.DISABLED)
 
+# --- Tic-Tac-Toe Selection GUI Frame ---
+class TicTacToeSelectionGUI(tk.Frame):
+    """Screen to select 1 player or 2 player mode."""
+    def __init__(self, parent, controller):
+        bg="#90EE90"
+        tk.Frame.__init__(self, parent, bg=bg) 
+        self.controller = controller
+
+        tk.Label(self, text="=== Tic-Tac-Toe Mode Selection ===", font=('Arial', 16, 'bold'), bg=bg).pack(pady=20)
+        
+        tk.Label(self, text="Choose your game mode:", font=('Arial', 12), bg=bg).pack(pady=10)
+        
+        tk.Button(self, text="1 Player (vs Computer)", width=30, font=('Arial', 12), command=self.start_one_player).pack(pady=10)
+        tk.Button(self, text="2 Players (Local)", width=30, font=('Arial', 12), command=self.start_two_player).pack(pady=10)
+        
+        tk.Button(self, text="Back to Menu", width=30, command=lambda: controller.show_frame("MainMenu")).pack(pady=20)
+    
+    def start_one_player(self):
+        """Starts 1 player game."""
+        tictactoe_frame = self.controller.frames["TicTacToeGUI"]
+        tictactoe_frame.set_game_mode(one_player=True)
+        self.controller.show_frame("TicTacToeGUI")
+    
+    def start_two_player(self):
+        """Starts 2 player game."""
+        tictactoe_frame = self.controller.frames["TicTacToeGUI"]
+        tictactoe_frame.set_game_mode(one_player=False)
+        self.controller.show_frame("TicTacToeGUI")
+
 # --- Tic-Tac-Toe GUI Frame ---
 class TicTacToeGUI(tk.Frame):
     def __init__(self, parent, controller):
@@ -819,9 +1987,12 @@ class TicTacToeGUI(tk.Frame):
         self.current_player = "X"
         self.buttons = {}  # Dictionary to hold the 9 button objects
         self.game_active = True
+        self.one_player = False  # Whether it's 1 player (vs computer) or 2 player
+        self.ai_thinking = False  # Flag to prevent clicks while computer is thinking
 
         # --- Widgets Setup ---
-        tk.Label(self, text="=== Tic-Tac-Toe (2-Player) ===", font=('Arial', 16, 'bold'), bg="#90EE90").pack(pady=10)
+        self.title_label = tk.Label(self, text="=== Tic-Tac-Toe (2-Player) ===", font=('Arial', 16, 'bold'), bg="#90EE90")
+        self.title_label.pack(pady=10)
         
         # Label to display current status
         self.status_label = tk.Label(self, text="Player X's turn", bg="#90EE90", font=('Arial', 14))
@@ -848,7 +2019,110 @@ class TicTacToeGUI(tk.Frame):
 
         # Control Buttons
         tk.Button(self, text="New Game", command=self.reset_game).pack(side=tk.LEFT, padx=10, pady=10)
-        tk.Button(self, text="Back to Menu", command=lambda: [self.reset_game(), controller.show_frame("MainMenu")]).pack(side=tk.RIGHT, padx=10, pady=10)
+        tk.Button(self, text="Back to Selection", command=lambda: [self.reset_game(), controller.show_frame("TicTacToeSelectionGUI")]).pack(side=tk.RIGHT, padx=10, pady=10)
+
+    def set_game_mode(self, one_player):
+        """Sets whether it's 1 player or 2 player mode."""
+        self.one_player = one_player
+        mode_text = "1 Player (vs Computer)" if one_player else "2 Player (Local)"
+        self.title_label.config(text=f"=== Tic-Tac-Toe: {mode_text} ===")
+        self.reset_game()
+    
+    def get_available_moves(self):
+        """Returns a list of available board positions."""
+        moves = []
+        for i in range(3):
+            for j in range(3):
+                if self.board[i][j] == ' ':
+                    moves.append((i, j))
+        return moves
+    
+    def evaluate_board(self):
+        """Simple board evaluation: +10 for X win, -10 for O win, 0 otherwise."""
+        winner = self.check_winner()
+        if winner == 'X':
+            return 10
+        elif winner == 'O':
+            return -10
+        else:
+            return 0
+    
+    def minimax(self, depth, is_maximizing):
+        """Minimax algorithm for AI (simple depth-limited search)."""
+        score = self.evaluate_board()
+        
+        # Terminal states
+        if score == 10:
+            return score - depth
+        if score == -10:
+            return score + depth
+        
+        available_moves = self.get_available_moves()
+        if not available_moves:
+            return 0
+        
+        # Limit depth to avoid long thinking time
+        if depth >= 6:
+            return 0
+        
+        if is_maximizing:
+            max_score = -float('inf')
+            for row, col in available_moves:
+                self.board[row][col] = 'X'
+                score = self.minimax(depth + 1, False)
+                self.board[row][col] = ' '
+                max_score = max(score, max_score)
+            return max_score
+        else:
+            min_score = float('inf')
+            for row, col in available_moves:
+                self.board[row][col] = 'O'
+                score = self.minimax(depth + 1, True)
+                self.board[row][col] = ' '
+                min_score = min(score, min_score)
+            return min_score
+    
+    def get_best_move(self):
+        """Gets the best move for the AI using minimax algorithm."""
+        best_score = -float('inf')
+        best_move = None
+        
+        for row, col in self.get_available_moves():
+            self.board[row][col] = 'O'
+            score = self.minimax(0, False)
+            self.board[row][col] = ' '
+            
+            if score > best_score:
+                best_score = score
+                best_move = (row, col)
+        
+        return best_move
+    
+    def computer_move(self):
+        """Makes the computer's move."""
+        self.ai_thinking = True
+        self.status_label.config(text="Computer is thinking...")
+        self.update()
+        
+        move = self.get_best_move()
+        if move:
+            row, col = move
+            self.board[row][col] = 'O'
+            self.buttons[(row, col)].config(text='O', state=tk.DISABLED)
+            
+            winner = self.check_winner()
+            if winner:
+                self.status_label.config(text=f"🎉 Player {winner} wins!")
+                self.game_active = False
+                self.disable_all_buttons()
+            elif not self.get_available_moves():
+                self.status_label.config(text="🤝 It's a tie!")
+                self.game_active = False
+            else:
+                self.current_player = "X"
+                self.status_label.config(text="Player X's turn")
+        
+        self.ai_thinking = False
 
     def check_winner(self):
         """Checks the 3x3 board for a winner."""
@@ -874,7 +2148,11 @@ class TicTacToeGUI(tk.Frame):
 
     def button_click(self, row, col):
         """Handles the logic when a grid button is pressed."""
-        if not self.game_active or self.board[row][col] != ' ':
+        if not self.game_active or self.board[row][col] != ' ' or self.ai_thinking:
+            return
+
+        # Only allow clicks on X's turn in 1 player mode
+        if self.one_player and self.current_player != 'X':
             return
 
         # 1. Update the board state
@@ -899,7 +2177,12 @@ class TicTacToeGUI(tk.Frame):
         else:
             # 3. Switch player and update status label
             self.current_player = "O" if self.current_player == "X" else "X"
-            self.status_label.config(text=f"Player {self.current_player}'s turn")
+            
+            # If 1 player mode and it's now computer's turn, make the computer move
+            if self.one_player and self.current_player == "O":
+                self.after(500, self.computer_move)  # Delay 500ms for better UX
+            else:
+                self.status_label.config(text=f"Player {self.current_player}'s turn")
 
     def disable_all_buttons(self):
         """Disables all buttons at the end of the game."""
@@ -912,6 +2195,7 @@ class TicTacToeGUI(tk.Frame):
         self.board = [[' ' for _ in range(3)] for _ in range(3)]
         self.current_player = "X"
         self.game_active = True
+        self.ai_thinking = False
         self.status_label.config(text="Player X's turn")
         
         # Reset all button appearances and state
