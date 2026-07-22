@@ -666,13 +666,12 @@ class BattleshipGUI(tk.Frame):
         boards_frame = tk.Frame(self.content_frame, bg="#90EE90")
         boards_frame.pack(padx=10, fill=tk.BOTH, expand=True)
         
-        target_player = 2 if self.current_player == 1 else 1
         if self.game_mode == "COMPUTER":
             left_title = "Computer's Board"
             right_title = "Your Board"
         else:
-            left_title = f"Player {target_player}'s Board"
-            right_title = f"Player {self.current_player}'s Board"
+            left_title = "Player 1's Board"
+            right_title = "Player 2's Board"
         
         # LEFT BOARD: Opponent's Board (where player fires)
         left_frame = tk.Frame(boards_frame, bg="white", relief=tk.SUNKEN, bd=2)
@@ -750,29 +749,55 @@ class BattleshipGUI(tk.Frame):
         self.update_score_display()
     
     def update_all_boards(self):
-        """Updates both boards with current shot status."""
-        target_player = 2 if self.current_player == 1 else 1
+        """Updates the fixed boards for both players without swapping them on each turn."""
         if self.game_mode == "COMPUTER":
-            target_player = 2
-        
-        # Update target board (where current player fires)
+            # Keep the single-player view unchanged.
+            for row in range(self.grid_size):
+                for col in range(self.grid_size):
+                    btn = self.target_board_buttons[(row, col)]
+                    shot = self.player_shots[2][row][col]
+                    if shot == 'H':
+                        btn.config(bg="red", text="H")
+                    elif shot == 'M':
+                        btn.config(bg="lightgray", text="M")
+                    else:
+                        btn.config(bg="lightblue", text=" ")
+            
+            for row in range(self.grid_size):
+                for col in range(self.grid_size):
+                    btn = self.own_board_buttons[(row, col)]
+                    shot = self.player_shots[1][row][col]
+                    if self.player_boards[1][row][col] == 'S':
+                        if shot == 'H':
+                            btn.config(bg="darkred", text="H")
+                        elif shot == 'M':
+                            btn.config(bg="lightgreen", text=" ")
+                        else:
+                            btn.config(bg="lightgreen", text=" ")
+                    else:
+                        if shot == 'M':
+                            btn.config(bg="lightgray", text="M")
+                        else:
+                            btn.config(bg="lightgreen", text=" ")
+            return
+
+        # Two-player mode: keep Player 1's board and Player 2's board fixed.
         for row in range(self.grid_size):
             for col in range(self.grid_size):
                 btn = self.target_board_buttons[(row, col)]
-                shot = self.player_shots[self.current_player][row][col]
+                shot = self.player_shots[2][row][col]
                 if shot == 'H':
                     btn.config(bg="red", text="H")
                 elif shot == 'M':
                     btn.config(bg="lightgray", text="M")
                 else:
                     btn.config(bg="lightblue", text=" ")
-        
-        # Update own board (where the opponent fires)
+
         for row in range(self.grid_size):
             for col in range(self.grid_size):
                 btn = self.own_board_buttons[(row, col)]
-                shot = self.player_shots[target_player][row][col]
-                if self.player_boards[self.current_player][row][col] == 'S':
+                shot = self.player_shots[1][row][col]
+                if self.player_boards[2][row][col] == 'S':
                     if shot == 'H':
                         btn.config(bg="darkred", text="H")
                     elif shot == 'M':
