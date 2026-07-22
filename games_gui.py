@@ -482,7 +482,10 @@ class BattleshipGUI(tk.Frame):
     def show_mode_selection(self):
         """Show a simple mode selection screen before the game begins."""
         self.game_phase = "MODE_SELECTION"
+        self.game_mode = "COMPUTER"
         self.game_active = True
+        self.current_player = 1
+        self.placement_player = 1
         self.status_label.config(text="Choose a Battleship mode")
         self.score_label.pack_forget()
         self.instruction_label.pack_forget()
@@ -623,12 +626,13 @@ class BattleshipGUI(tk.Frame):
         board[:] = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         self.place_ships(board)
         
-        # Update display
+        # Update display using the active player's placement colors
+        cell_bg = "lightblue" if self.placement_player == 1 else "lightpink"
         for (row, col), btn in self.placement_board_buttons.items():
             if board[row][col] == 'S':
                 btn.config(bg="gray")
             else:
-                btn.config(bg="lightblue")
+                btn.config(bg=cell_bg)
         
         self.instruction_label.config(text="Ships randomly placed! Click 'Start Game'")
         self.current_ship_idx = 6
@@ -859,11 +863,11 @@ class BattleshipGUI(tk.Frame):
     
     def reset_to_placement(self):
         """Go back to the placement phase."""
-        self.start_mode(self.game_mode)
+        self.show_mode_selection()
     
     def back_to_menu(self):
         """Return to more games menu and reset window size."""
-        self.start_mode(self.game_mode)
+        self.show_mode_selection()
         self.controller.winfo_toplevel().geometry("600x550")
         self.controller.show_frame("MoreGamesMenu")
     
