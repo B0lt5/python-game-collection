@@ -6,3 +6,6 @@ venv/
 dist/
 build/
 *.spec
+
+.gitattributes
+.gitignore

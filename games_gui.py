@@ -416,32 +416,40 @@ class BattleshipGUI(tk.Frame):
         
         # Game State Variables
         self.grid_size = 10
-        self.player_board = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
-        self.player_shots = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
-        self.computer_board = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
-        self.computer_shots = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        self.player_boards = {
+            1: [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)],
+            2: [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        }
+        self.player_shots = {
+            1: [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)],
+            2: [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        }
         
-        self.player_hits = 0
-        self.computer_hits = 0
+        self.player_hits = {1: 0, 2: 0}
         self.total_ship_cells = 9  # 1 3-cell + 2 2-cell + 3 1-cell = 9 cells
-        self.game_phase = "PLACEMENT"  # PLACEMENT or PLAYING
+        self.game_phase = "MODE_SELECTION"
+        self.game_mode = "COMPUTER"
+        self.game_active = True
+        self.current_player = 1
+        self.placement_player = 1
         
         # Ship placement variables
-        self.ships_to_place = [(3, 1), (2, 2), (1, 3)]  # (size, count)
         self.ship_sizes = [3, 2, 2, 1, 1, 1]  # Flat list of 6 ship sizes
         self.current_ship_idx = 0
         self.current_ship_size = 3
         self.placement_board_buttons = {}
+        self.target_board_buttons = {}
+        self.own_board_buttons = {}
         
         # --- Widgets Setup ---
         tk.Label(self, text="=== Battleship ===", font=('Arial', 16, 'bold'), bg="#90EE90").pack(pady=10)
         
         # Status label
-        self.status_label = tk.Label(self, text="Place your ships! Click on the board.", font=('Arial', 12), bg="#90EE90")
+        self.status_label = tk.Label(self, text="Choose a game mode.", font=('Arial', 12), bg="#90EE90")
         self.status_label.pack(pady=5)
         
         # Scores (hidden during placement)
-        self.score_label = tk.Label(self, text="Your Hits: 0/9 | Computer Hits: 0/9", font=('Arial', 11), bg="#90EE90")
+        self.score_label = tk.Label(self, text="", font=('Arial', 11), bg="#90EE90")
         
         # Placement instructions (shown during placement)
         self.instruction_label = tk.Label(self, text="Ship placement goes here", font=('Arial', 10), bg="#90EE90")
@@ -452,6 +460,7 @@ class BattleshipGUI(tk.Frame):
         
         # Game log
         self.log_text = tk.Text(self, height=6, width=40, state=tk.DISABLED)
+        self.log_text.pack(pady=5)
         
         # Frame for Input
         self.input_frame = tk.Frame(self, bg="#90EE90")
@@ -468,17 +477,65 @@ class BattleshipGUI(tk.Frame):
         # Control Buttons frame
         self.button_frame = tk.Frame(self, bg="#90EE90")
         
-        # Start the placement phase
+        self.show_mode_selection()
+    
+    def show_mode_selection(self):
+        """Show a simple mode selection screen before the game begins."""
+        self.game_phase = "MODE_SELECTION"
+        self.game_active = True
+        self.status_label.config(text="Choose a Battleship mode")
+        self.score_label.pack_forget()
+        self.instruction_label.pack_forget()
+        self.input_frame.pack_forget()
+        self.button_frame.pack_forget()
+        
+        self.content_frame.pack_forget()
+        self.content_frame.destroy()
+        self.content_frame = tk.Frame(self, bg="#90EE90")
+        self.content_frame.pack(pady=10, fill=tk.BOTH, expand=True)
+        
+        mode_frame = tk.Frame(self.content_frame, bg="#90EE90")
+        mode_frame.pack(expand=True)
+        
+        tk.Label(mode_frame, text="Select Battleship Mode", font=('Arial', 14, 'bold'), bg="#90EE90").pack(pady=10)
+        tk.Label(mode_frame, text="Play against the computer or a second player", font=('Arial', 11), bg="#90EE90").pack(pady=5)
+        tk.Button(mode_frame, text="1 Player (vs Computer)", width=22, command=lambda: self.start_mode("COMPUTER")).pack(pady=8)
+        tk.Button(mode_frame, text="2 Players (Hot Seat)", width=22, command=lambda: self.start_mode("TWOPLAYER")).pack(pady=8)
+    
+    def start_mode(self, mode):
+        """Start a new game in the selected mode."""
+        self.game_mode = mode
+        self.game_active = True
+        self.current_player = 1
+        self.placement_player = 1
+        self.player_hits = {1: 0, 2: 0}
+        self.player_boards = {
+            1: [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)],
+            2: [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        }
+        self.player_shots = {
+            1: [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)],
+            2: [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        }
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.delete('1.0', tk.END)
+        self.log_text.config(state=tk.DISABLED)
         self.init_placement_phase()
     
     def init_placement_phase(self):
         """Initialize the ship placement phase."""
         self.game_phase = "PLACEMENT"
-        self.player_board = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         self.current_ship_idx = 0
         self.current_ship_size = self.ship_sizes[0]
         
-        self.status_label.config(text=f"Place your ships! Click on the board.")
+        if self.game_mode == "TWOPLAYER":
+            if self.placement_player == 1:
+                self.status_label.config(text="Player 1, place your ships.")
+            else:
+                self.status_label.config(text="Player 2, place your ships.")
+        else:
+            self.status_label.config(text="Place your ships! Click on the board.")
+        
         self.instruction_label.config(text=f"Placing ship of size {self.current_ship_size} (ship 1 of 6)")
         self.instruction_label.pack(pady=5)
         self.score_label.pack_forget()
@@ -490,23 +547,29 @@ class BattleshipGUI(tk.Frame):
         self.content_frame.pack(pady=10, fill=tk.BOTH, expand=True)
         
         # Create placement board
-        board_frame = tk.Frame(self.content_frame, bg="white", relief=tk.SUNKEN, bd=2)
+        placement_bg = "#E6F7FF" if self.placement_player == 1 else "#FFE6E6"
+        cell_bg = "lightblue" if self.placement_player == 1 else "lightpink"
+        board_frame = tk.Frame(self.content_frame, bg=placement_bg, relief=tk.SUNKEN, bd=2)
         board_frame.pack(padx=10, fill=tk.BOTH, expand=True)
         
-        tk.Label(board_frame, text="Your Board - Place Ships", font=('Arial', 10, 'bold'), bg="white").pack()
+        if self.game_mode == "TWOPLAYER":
+            board_title = f"Player {self.placement_player} - Place Ships"
+        else:
+            board_title = "Your Board - Place Ships"
+        tk.Label(board_frame, text=board_title, font=('Arial', 10, 'bold'), bg=placement_bg).pack()
         
-        grid_frame = tk.Frame(board_frame, bg="white")
+        grid_frame = tk.Frame(board_frame, bg=placement_bg)
         grid_frame.pack(padx=5, pady=5)
         
-        tk.Label(grid_frame, text="  ", bg="white", width=2).grid(row=0, column=0)
+        tk.Label(grid_frame, text="  ", bg=placement_bg, width=2).grid(row=0, column=0)
         for col in range(self.grid_size):
-            tk.Label(grid_frame, text=chr(ord('A') + col), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=0, column=col + 1)
+            tk.Label(grid_frame, text=chr(ord('A') + col), bg=placement_bg, width=2, font=('Arial', 8, 'bold')).grid(row=0, column=col + 1)
         
         self.placement_board_buttons = {}
         for row in range(self.grid_size):
-            tk.Label(grid_frame, text=str(row + 1), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=row + 1, column=0)
+            tk.Label(grid_frame, text=str(row + 1), bg=placement_bg, width=2, font=('Arial', 8, 'bold')).grid(row=row + 1, column=0)
             for col in range(self.grid_size):
-                btn = tk.Label(grid_frame, text=" ", bg="lightblue", width=2, height=1, font=('Arial', 8), relief=tk.RAISED, bd=1)
+                btn = tk.Label(grid_frame, text=" ", bg=cell_bg, width=2, height=1, font=('Arial', 8), relief=tk.RAISED, bd=1)
                 btn.grid(row=row + 1, column=col + 1)
                 btn.bind("<Button-1>", lambda e, r=row, c=col: self.place_ship_on_board(r, c))
                 self.placement_board_buttons[(row, col)] = btn
@@ -515,12 +578,16 @@ class BattleshipGUI(tk.Frame):
         placement_btn_frame = tk.Frame(self.content_frame, bg="#90EE90")
         placement_btn_frame.pack(pady=10)
         tk.Button(placement_btn_frame, text="Random Placement", command=self.random_placement).pack(side=tk.LEFT, padx=5)
-        tk.Button(placement_btn_frame, text="Start Game", command=self.start_game_from_placement).pack(side=tk.LEFT, padx=5)
+        if self.game_mode == "TWOPLAYER" and self.placement_player == 1:
+            tk.Button(placement_btn_frame, text="Second Player", command=self.start_game_from_placement).pack(side=tk.LEFT, padx=5)
+        else:
+            tk.Button(placement_btn_frame, text="Start Game", command=self.start_game_from_placement).pack(side=tk.LEFT, padx=5)
     
     def place_ship_on_board(self, row, col):
         """Try to place a ship at the given coordinates."""
-        if not self.can_place_ship(self.player_board, row, col, self.current_ship_size, 'H'):
-            if not self.can_place_ship(self.player_board, row, col, self.current_ship_size, 'V'):
+        board = self.player_boards[self.placement_player if self.game_mode == "TWOPLAYER" else 1]
+        if not self.can_place_ship(board, row, col, self.current_ship_size, 'H'):
+            if not self.can_place_ship(board, row, col, self.current_ship_size, 'V'):
                 self.instruction_label.config(text="Can't place there! Try another spot.")
                 return
             direction = 'V'
@@ -530,17 +597,21 @@ class BattleshipGUI(tk.Frame):
         # Place the ship
         for i in range(self.current_ship_size):
             if direction == 'H':
-                self.player_board[row][col + i] = 'S'
+                board[row][col + i] = 'S'
                 self.placement_board_buttons[(row, col + i)].config(bg="gray")
             else:
-                self.player_board[row + i][col] = 'S'
+                board[row + i][col] = 'S'
                 self.placement_board_buttons[(row + i, col)].config(bg="gray")
         
         # Move to next ship
         self.current_ship_idx += 1
         if self.current_ship_idx >= 6:  # 6 total ships
-            self.instruction_label.config(text="All ships placed! Starting game...")
-            self.after(500, self.start_game_from_placement)  # Auto-start after 500ms
+            if self.game_mode == "TWOPLAYER" and self.placement_player == 1:
+                self.instruction_label.config(text="Player 1 ships are ready. Click 'Second Player' to continue.")
+            elif self.game_mode == "TWOPLAYER" and self.placement_player == 2:
+                self.instruction_label.config(text="Player 2 ships are ready. Click 'Start Game'.")
+            else:
+                self.instruction_label.config(text="All ships placed! Click 'Start Game'.")
         else:
             self.current_ship_size = self.ship_sizes[self.current_ship_idx]
             ship_num = self.current_ship_idx + 1
@@ -548,12 +619,13 @@ class BattleshipGUI(tk.Frame):
     
     def random_placement(self):
         """Randomly place all remaining ships."""
-        self.player_board = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
-        self.place_ships(self.player_board)
+        board = self.player_boards[self.placement_player if self.game_mode == "TWOPLAYER" else 1]
+        board[:] = [[' ' for _ in range(self.grid_size)] for _ in range(self.grid_size)]
+        self.place_ships(board)
         
         # Update display
         for (row, col), btn in self.placement_board_buttons.items():
-            if self.player_board[row][col] == 'S':
+            if board[row][col] == 'S':
                 btn.config(bg="gray")
             else:
                 btn.config(bg="lightblue")
@@ -567,8 +639,16 @@ class BattleshipGUI(tk.Frame):
             self.instruction_label.config(text="Place all ships first!")
             return
         
+        if self.game_mode == "TWOPLAYER" and self.placement_player == 1:
+            self.placement_player = 2
+            self.current_ship_idx = 0
+            self.current_ship_size = self.ship_sizes[0]
+            self.init_placement_phase()
+            return
+        
         self.game_phase = "PLAYING"
-        self.place_ships(self.computer_board)
+        if self.game_mode == "COMPUTER":
+            self.place_ships(self.player_boards[2])
         self.instruction_label.config(text="")
         self.instruction_label.pack_forget()
         self.score_label.pack(pady=5)
@@ -586,11 +666,19 @@ class BattleshipGUI(tk.Frame):
         boards_frame = tk.Frame(self.content_frame, bg="#90EE90")
         boards_frame.pack(padx=10, fill=tk.BOTH, expand=True)
         
-        # LEFT BOARD: Computer's Board (where player fires)
+        target_player = 2 if self.current_player == 1 else 1
+        if self.game_mode == "COMPUTER":
+            left_title = "Computer's Board"
+            right_title = "Your Board"
+        else:
+            left_title = f"Player {target_player}'s Board"
+            right_title = f"Player {self.current_player}'s Board"
+        
+        # LEFT BOARD: Opponent's Board (where player fires)
         left_frame = tk.Frame(boards_frame, bg="white", relief=tk.SUNKEN, bd=2)
         left_frame.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
         
-        tk.Label(left_frame, text="Computer's Board", font=('Arial', 10, 'bold'), bg="white").pack()
+        tk.Label(left_frame, text=left_title, font=('Arial', 10, 'bold'), bg="white").pack()
         
         left_grid = tk.Frame(left_frame, bg="white")
         left_grid.pack(padx=5, pady=5)
@@ -599,19 +687,19 @@ class BattleshipGUI(tk.Frame):
         for col in range(self.grid_size):
             tk.Label(left_grid, text=chr(ord('A') + col), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=0, column=col + 1)
         
-        self.computer_board_buttons = {}
+        self.target_board_buttons = {}
         for row in range(self.grid_size):
             tk.Label(left_grid, text=str(row + 1), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=row + 1, column=0)
             for col in range(self.grid_size):
                 btn = tk.Label(left_grid, text=" ", bg="lightblue", width=2, height=1, font=('Arial', 8), relief=tk.RAISED, bd=1)
                 btn.grid(row=row + 1, column=col + 1)
-                self.computer_board_buttons[(row, col)] = btn
+                self.target_board_buttons[(row, col)] = btn
         
-        # RIGHT BOARD: Player's Board (where computer fires)
+        # RIGHT BOARD: Current player's board (where opponent fires)
         right_frame = tk.Frame(boards_frame, bg="white", relief=tk.SUNKEN, bd=2)
         right_frame.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
         
-        tk.Label(right_frame, text="Your Board", font=('Arial', 10, 'bold'), bg="white").pack()
+        tk.Label(right_frame, text=right_title, font=('Arial', 10, 'bold'), bg="white").pack()
         
         right_grid = tk.Frame(right_frame, bg="white")
         right_grid.pack(padx=5, pady=5)
@@ -620,13 +708,13 @@ class BattleshipGUI(tk.Frame):
         for col in range(self.grid_size):
             tk.Label(right_grid, text=chr(ord('A') + col), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=0, column=col + 1)
         
-        self.player_board_buttons = {}
+        self.own_board_buttons = {}
         for row in range(self.grid_size):
             tk.Label(right_grid, text=str(row + 1), bg="white", width=2, font=('Arial', 8, 'bold')).grid(row=row + 1, column=0)
             for col in range(self.grid_size):
                 btn = tk.Label(right_grid, text=" ", bg="lightgreen", width=2, height=1, font=('Arial', 8), relief=tk.RAISED, bd=1)
                 btn.grid(row=row + 1, column=col + 1)
-                self.player_board_buttons[(row, col)] = btn
+                self.own_board_buttons[(row, col)] = btn
         
         # Log and input frame
         log_input_frame = tk.Frame(self.content_frame, bg="#90EE90")
@@ -657,16 +745,21 @@ class BattleshipGUI(tk.Frame):
         tk.Button(self.button_frame, text="New Game", command=self.reset_to_placement).pack(side=tk.LEFT, padx=10)
         tk.Button(self.button_frame, text="Back to More Games", command=self.back_to_menu).pack(side=tk.RIGHT, padx=10)
         
-        self.log("Game started!")
+        self.log(f"Game started! {'Computer' if self.game_mode == 'COMPUTER' else f'Player {self.current_player}'} to move.")
         self.update_all_boards()
+        self.update_score_display()
     
     def update_all_boards(self):
         """Updates both boards with current shot status."""
-        # Update computer's board (where player fires)
+        target_player = 2 if self.current_player == 1 else 1
+        if self.game_mode == "COMPUTER":
+            target_player = 2
+        
+        # Update target board (where current player fires)
         for row in range(self.grid_size):
             for col in range(self.grid_size):
-                btn = self.computer_board_buttons[(row, col)]
-                shot = self.player_shots[row][col]
+                btn = self.target_board_buttons[(row, col)]
+                shot = self.player_shots[self.current_player][row][col]
                 if shot == 'H':
                     btn.config(bg="red", text="H")
                 elif shot == 'M':
@@ -674,18 +767,18 @@ class BattleshipGUI(tk.Frame):
                 else:
                     btn.config(bg="lightblue", text=" ")
         
-        # Update player's board (where computer fires)
+        # Update own board (where the opponent fires)
         for row in range(self.grid_size):
             for col in range(self.grid_size):
-                btn = self.player_board_buttons[(row, col)]
-                shot = self.computer_shots[row][col]
-                if self.player_board[row][col] == 'S':
+                btn = self.own_board_buttons[(row, col)]
+                shot = self.player_shots[target_player][row][col]
+                if self.player_boards[self.current_player][row][col] == 'S':
                     if shot == 'H':
                         btn.config(bg="darkred", text="H")
                     elif shot == 'M':
-                        pass  # Don't show misses on player's board
+                        btn.config(bg="lightgreen", text=" ")
                     else:
-                        btn.config(bg="lightgreen", text="S")
+                        btn.config(bg="lightgreen", text=" ")
                 else:
                     if shot == 'M':
                         btn.config(bg="lightgray", text="M")
@@ -741,17 +834,20 @@ class BattleshipGUI(tk.Frame):
     
     def reset_to_placement(self):
         """Go back to the placement phase."""
-        self.init_placement_phase()
+        self.start_mode(self.game_mode)
     
     def back_to_menu(self):
         """Return to more games menu and reset window size."""
-        self.reset_to_placement()
+        self.start_mode(self.game_mode)
         self.controller.winfo_toplevel().geometry("600x550")
         self.controller.show_frame("MoreGamesMenu")
     
     def update_score_display(self):
         """Updates the score display."""
-        self.score_label.config(text=f"Your Hits: {self.player_hits}/{self.total_ship_cells} | Computer Hits: {self.computer_hits}/{self.total_ship_cells}")
+        if self.game_mode == "COMPUTER":
+            self.score_label.config(text=f"Your Hits: {self.player_hits[1]}/{self.total_ship_cells} | Computer Hits: {self.player_hits[2]}/{self.total_ship_cells}")
+        else:
+            self.score_label.config(text=f"Player 1 Hits: {self.player_hits[1]}/{self.total_ship_cells} | Player 2 Hits: {self.player_hits[2]}/{self.total_ship_cells}")
     
     def coordinates_to_index(self, letter, number):
         """Converts letter and number to row and column indices."""
@@ -772,8 +868,14 @@ class BattleshipGUI(tk.Frame):
         number = row + 1
         return f"{letter} {number}"
     
+    def player_name(self, player_num):
+        """Return a friendly name for each player."""
+        if self.game_mode == "COMPUTER" and player_num == 2:
+            return "Computer"
+        return f"Player {player_num}"
+    
     def player_fire(self):
-        """Handles player's fire action."""
+        """Handles the current player's fire action."""
         letter = self.letter_entry.get().strip()
         number = self.number_entry.get().strip()
         
@@ -786,32 +888,49 @@ class BattleshipGUI(tk.Frame):
             self.log("⚠️ Invalid coordinates! Use format: A 5")
             return
         
-        if self.player_shots[row][col] != ' ':
+        current_player = self.current_player
+        target_player = 2 if current_player == 1 else 1
+        if self.game_mode == "COMPUTER":
+            target_player = 2
+        
+        if self.player_shots[current_player][row][col] != ' ':
             self.log("⚠️ You already fired at that location!")
             return
         
-        # Fire at computer's board
-        if self.computer_board[row][col] == 'S':
-            self.player_shots[row][col] = 'H'  # Hit
-            self.player_hits += 1
+        # Fire at the target player's board
+        if self.player_boards[target_player][row][col] == 'S':
+            self.player_shots[current_player][row][col] = 'H'  # Hit
+            self.player_hits[current_player] += 1
             coords = self.index_to_coordinates(row, col)
-            self.log(f"🎯 Hit at {coords}!")
+            self.log(f"🎯 {self.player_name(current_player)} hit at {coords}!")
             
-            if self.player_hits >= self.total_ship_cells:
-                self.log("🎉 You sank all the computer's ships! You win!")
+            if self.player_hits[current_player] >= self.total_ship_cells:
+                self.log(f"🎉 {self.player_name(current_player)} sank all ships! {self.player_name(current_player)} wins!")
                 self.game_active = False
                 self.end_game()
                 return
         else:
-            self.player_shots[row][col] = 'M'  # Miss
+            self.player_shots[current_player][row][col] = 'M'  # Miss
             coords = self.index_to_coordinates(row, col)
-            self.log(f"❌ Miss at {coords}.")
+            self.log(f"❌ {self.player_name(current_player)} missed at {coords}.")
         
         self.update_all_boards()
         self.update_score_display()
         
-        # Computer's turn
-        self.computer_fire()
+        if self.game_mode == "COMPUTER":
+            self.computer_fire()
+        else:
+            self.switch_turn()
+    
+    def switch_turn(self):
+        """Switch to the next player in two-player mode."""
+        if not self.game_active:
+            return
+        self.current_player = 2 if self.current_player == 1 else 1
+        self.log(f"🔄 {self.player_name(self.current_player)}'s turn")
+        self.status_label.config(text=f"{self.player_name(self.current_player)}'s turn")
+        self.update_all_boards()
+        self.update_score_display()
     
     def computer_fire(self):
         """Handles computer's fire action (random for now)."""
@@ -820,28 +939,28 @@ class BattleshipGUI(tk.Frame):
         
         # Find an unfired location
         attempts = 0
-        while self.computer_shots[row][col] != ' ' and attempts < 100:
+        while self.player_shots[2][row][col] != ' ' and attempts < 100:
             row = random.randint(0, self.grid_size - 1)
             col = random.randint(0, self.grid_size - 1)
             attempts += 1
         
-        if self.computer_shots[row][col] != ' ':
+        if self.player_shots[2][row][col] != ' ':
             return  # No valid moves left (shouldn't happen)
         
         # Fire at player's board
-        if self.player_board[row][col] == 'S':
-            self.computer_shots[row][col] = 'H'  # Hit
-            self.computer_hits += 1
+        if self.player_boards[1][row][col] == 'S':
+            self.player_shots[2][row][col] = 'H'  # Hit
+            self.player_hits[2] += 1
             coords = self.index_to_coordinates(row, col)
             self.log(f"💥 Computer hit at {coords}!")
             
-            if self.computer_hits >= self.total_ship_cells:
+            if self.player_hits[2] >= self.total_ship_cells:
                 self.log("💻 Computer sank all your ships! You lose!")
                 self.game_active = False
                 self.end_game()
                 return
         else:
-            self.computer_shots[row][col] = 'M'  # Miss
+            self.player_shots[2][row][col] = 'M'  # Miss
             coords = self.index_to_coordinates(row, col)
             self.log(f"💭 Computer fired at {coords} and missed.")
         
